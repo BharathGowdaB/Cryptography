@@ -5,7 +5,8 @@ serverPort = 8001
 
 clientSocket = socket()
 
-clientSocket.connect(('127.0.0.5',int(serverPort)))
+clientSocket.connect(('localhost',int(serverPort)))
+
 #uniId = na-na-na-na-na          n-> no of characters  a->shifting value
 def encryptDecryptData(uniId,msg,type) :
     length = len(uniId)
@@ -18,6 +19,7 @@ def encryptDecryptData(uniId,msg,type) :
     for i in range(1,length,2) :
         a.append(int(uniId[i]) * type) 
     sum = 0
+    
     for i in range(len(n)) :
         sum += n[i]
         
@@ -42,14 +44,16 @@ print(text)
 while 1 :
     
     msg = input('Input lowercase sentence: ')
+    dataToSend = encryptDeccryptData('12342515',msg,1)
+    dataBytes = bytes(dataToSend,'utf-8')
+  
+    clientSocket.send(dataBytes)
     
-    msg2 = bytes(msg,'utf-8')
-    print(clientSocket)
-    print(msg2)
-    clientSocket.send(msg2)
     if(msg == 'exit'):
-        sys.exit()
-    modifiedSentence = clientSocket.recv(1024)
+        break
+      
+    response = clientSocket.recv(1024)
     
-    print('From Server :' , modifiedSentence)
+    msgreceived = encryptDeccryptData('12342515',msg,-1)
+    print('From Server :' ,msgReceived)
 
