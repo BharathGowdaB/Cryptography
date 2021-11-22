@@ -13,6 +13,7 @@ clientSocket.connect(('localhost',int(serverPort)))
 uniId = ''
 isactive = True
 user = {}
+isServer = False
 
 #uniId = na-na-na-na-na          n-> no of characters  a->shifting value
 def encryptDecryptData(uniId,msg,multiplier) :
@@ -32,51 +33,51 @@ def encryptDecryptData(uniId,msg,multiplier) :
 
 def sendingThread() :
     global clientSocket
-    print('enter msg to send')
+    print('Enter your message :')
     msg = input()
     data = re.split('\s*[:,]\s*',msg,3)
-    print(data)
     
     if len(data) > 3 and  re.search('.*TO',data[0].upper()) != None and re.search('M.*S.*G.*',data[2].upper()) != None :
+        res  = ''
         try : 
             message = {
                 'to' : int(data[1]),
                 'msg' : encryptDecryptData(user['id'],data[3],1)
             }
-            
-            data = json.dumps(message)
-            clientSocket.send(data.encode())
-            print('msg sent')
+            res = json.dumps(message)   
         except :
             print('Invalid Number :')
+
+        clientSocket.send(res.encode())    
     else :
         print("Please re-enter the message with proper format,\n\n To : 'number',Message : 'your message' \n")
+
 
 def historyThread() :
     print('History to be created')
 
 def receivingThread() :
-    global clientSocket,isactive,user
+    global clientSocket,isactive,user,isServer
     while isactive :
         try : 
             data = clientSocket.recv(2048)
             msg = data.decode()
             data = json.loads(data)
             if not data['error'] :
-                print(encryptDecryptData(user['id'],data['msg'],-1))
+                print('\tFrom : ' , str(data['from']),', MSG : ' ,encryptDecryptData(user['id'],data['msg'],-1))
             else :
                 print(data['type'])
         except :
-            print('Error in receiving Thread')
-
-    print('Session Ended :')
+            isServer = False
+            print('Server Not Responding')
+            break
 
 def helpThread() :
-    print('Available Command with Syntax')
-    print("send :     //send message ")
-    print("history :  //get your message history")
-    print("help :     // to get additional help")   
-    print("exit :     //to end the session")
+    print('\nAvailable Commands')
+    print("\tsend      --send message ")
+    print("\thistory   --get your message history")
+    print("\thelp      -- to get additional help")   
+    print("\texit      --to end the session")
 
 def registerUserThread(client) :
     num = input('Enter your number : ')
@@ -88,8 +89,9 @@ def registerUserThread(client) :
 
 
 user = registerUserThread(clientSocket) 
-print(user)
+
 if not user['error'] :
+    isServer = True
     print("use 'help' to get help")
     id = user['id']
     recevier = threading.Thread(target=receivingThread, args=())
@@ -100,10 +102,16 @@ if not user['error'] :
             com = com.upper()
             if com == 'HELP' :
                 helpThread()
+
             elif com == 'SEND' :
-                sendingThread()
+                if isServer :
+                    sendingThread()
+                else :
+                    print('Server Unavailable')
+
             elif com == 'HISTORY' :
                 historyThread()
+
             elif com == 'EXIT' :
                 isactive = False
                 clientSocket.send('exit'.encode())
@@ -112,9 +120,9 @@ if not user['error'] :
                 print("Command doesn't exit, use 'help' command")
         
         except :
-            print('error in while')
-    
- 
+            break
+
+    print('Session Ended :')
     sys.exit()
     
 else :

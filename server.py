@@ -32,7 +32,6 @@ def encryptData(senderId,receiverId,msg) :
     r = 0
 
     for i in range(len(msg)) :
-        print(s,r)
         text += chr(ord(msg[i]) + int(senderPat[s]) - int(receiverPat[r]))
         s = (s + 1) % len(senderPat)
         r = (r + 1) % len(receiverPat)
@@ -66,7 +65,7 @@ def clientManager(client,addr,user):
                 break  
             data = json.loads(msg)
     
-            print(str(data['to']) , ' : ',data['msg'])
+            print('\tFrom : ',user['mobNo'] ,', Message :' ,data['msg'])
 
             receiver = getUser(data['to'])
             if receiver == None :
@@ -76,15 +75,18 @@ def clientManager(client,addr,user):
                 }
                 res = json.dumps(res)
                 client.send(res.encode())
+                print('\tTo : Receiver Offline')
             else :
                 text = encryptData(user['id'],receiver['id'],data['msg'])
                 res = {
-                    'from' : receiver['mobNo'],
+                    'from' : user['mobNo'],
                     'msg' : text,
                     'error' :False
                 }
+                print('\tTo   : ' ,receiver['mobNo'],', Message :' ,res['msg'])
                 res = json.dumps(res)
                 receiver['ip'].send(res.encode())
+                
         except :
             dbms_Authenticate.remove(user)
             print(str(user['mobNo'] ), ' : ' , 'error')
@@ -109,7 +111,6 @@ def registerClient(clientSocket,addr) :
         thread.start()
 
         res = { 'error' : False , 'type' :'' ,'id' : user['id'] }
-        print(res)
         data = json.dumps(res)
         clientSocket.send(data.encode())
     except :
