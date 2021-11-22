@@ -3,13 +3,17 @@ import threading
 import json
 import sys
 import random
+import os 
+import re
+
+db = os.path.join(os.getcwd(),'Database')
+dbms_clientbox = os.path.join(db,'dbms_clientbox.csv')
+dbms_authenticate = []
 
 serverPort = 8001
 serverSocket = socket(AF_INET,SOCK_STREAM)
 serverSocket.bind(('',serverPort))
 serverSocket.listen(5)
-
-dbms_Authenticate = []
 
 print('The server is running at port : ' + str(serverPort))
 
@@ -46,18 +50,50 @@ def getNewId(length) :
     return id
 
 def getUser(mobNo) :
-    for user in dbms_Authenticate :
+    for user in dbms_authenticate :
         if user['mobNo'] == mobNo :
             return user
-    
-def clientManager(client,addr,user):
+
+def checkForMsg(client,user,lock) :
+    lock.acquire()
+    box = open(dbms_clientbox,'r')
+    data = box.read()
+    line = re.split('&\n*',data)
+    msgList = []
+    text = line[0]
+    del line[0]
+    for x in line :
+        msg = re.search('^'+str(user['mobNo']),x)
+        if msg != None :
+            data = x.split(',')
+            res = {
+                    'from' : data[1],
+                    'msg' : encryptData(data[2],user['key'],data[3]),
+                    'error' :False
+            }
+            print('\tTo   : ' ,user['mobNo'],', Message :' ,res['msg'])
+            msgList.append(res)
+        else :
+            text +=  '&\n' + x
+    box = open(dbms_clientbox,'w')
+    box.write(text)
+    box.close()
+    lock.release()
+    for i in range(len(msgList)) :
+        res = json.dumps(msgList[i])
+        client.send(res.encode())
+
+
+
+def clientManager(client,addr,user,lock):
     print('Connected to Client : ' + str(user['mobNo']))
+    checkForMsg(client,user,lock)
     while True:
         try :
             data = client.recv(2048)
             msg = data.decode()
             if msg.lower() == 'exit':
-                dbms_Authenticate.remove(user)
+                dbms_authenticate.remove(user)
                 res = {'error' : True ,'type' : 'exiting...'}
                 data = json.dumps(res)
                 client.send(data.encode())
@@ -73,11 +109,19 @@ def clientManager(client,addr,user):
                     'error' : True,
                     'type' : 'Receiver Offline'
                 }
+
+                lock.acquire()
+                text = '&\n'+str(data['to']) + ','  + str(user['mobNo']) + ',' + user['key'] + ',' + data['msg']
+                box = open(dbms_clientbox ,mode='a+')
+                box.write(text)
+                box.close()
+                lock.release()
+
                 res = json.dumps(res)
                 client.send(res.encode())
                 print('\tTo : Receiver Offline')
             else :
-                text = encryptData(user['id'],receiver['id'],data['msg'])
+                text = encryptData(user['key'],receiver['key'],data['msg'])
                 res = {
                     'from' : user['mobNo'],
                     'msg' : text,
@@ -88,35 +132,35 @@ def clientManager(client,addr,user):
                 receiver['ip'].send(res.encode())
                 
         except :
-            dbms_Authenticate.remove(user)
+            dbms_authenticate.remove(user)
             print(str(user['mobNo'] ), ' : ' , 'error')
             break
 
-
     print('Client : '+ str(user['mobNo']) + ', session ended') 
 
-def registerClient(clientSocket,addr) :
-    global dbms_Authenticate
+def registerClient(clientSocket,addr,lock) :
+    global dbms_authenticate
     user = {}
     try : 
         client = clientSocket.recv(256)
         
         user['ip'] = clientSocket
         user['mobNo'] = int(client.decode())
-        user['id'] = getNewId(10)
+        user['key'] = getNewId(10)
        
-        dbms_Authenticate.append(user)
+        dbms_authenticate.append(user)
 
-        thread = threading.Thread(target=clientManager,args=(clientSocket,addr,user))
+        thread = threading.Thread(target=clientManager,args=(clientSocket,addr,user,lock))
         thread.start()
 
-        res = { 'error' : False , 'type' :'' ,'id' : user['id'] }
+        res = { 'error' : False , 'type' :'' ,'key' : user['key'] }
         data = json.dumps(res)
         clientSocket.send(data.encode())
     except :
         res = { 'error' : True , 'Type' : 'Invalid Number' }
         data = json.dumps(res)
         clientSocket.send(data.encode())
+
 
 def exitTemp() :
     i = input()
@@ -129,10 +173,12 @@ while 1 :
     e.start()
     try :
         clientSocket,addr = serverSocket.accept()
-        c = threading.Thread(target=registerClient ,args=(clientSocket,addr))
+        lock = threading.Lock()
+        c = threading.Thread(target=registerClient ,args=(clientSocket,addr,lock))
         c.start()
     except :
         print('Error at main server :')
+        break
         
 
     

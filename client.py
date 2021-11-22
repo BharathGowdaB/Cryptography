@@ -4,6 +4,7 @@ import json
 import threading
 import re
 
+
 serverName = 'servername'
 serverPort = 8001
 
@@ -42,7 +43,7 @@ def sendingThread() :
         try : 
             message = {
                 'to' : int(data[1]),
-                'msg' : encryptDecryptData(user['id'],data[3],1)
+                'msg' : encryptDecryptData(user['key'],data[3],1)
             }
             res = json.dumps(message)   
         except :
@@ -52,25 +53,24 @@ def sendingThread() :
     else :
         print("Please re-enter the message with proper format,\n\n To : 'number',Message : 'your message' \n")
 
-
 def historyThread() :
     print('History to be created')
 
 def receivingThread() :
     global clientSocket,isactive,user,isServer
     while isactive :
-        try : 
+    
             data = clientSocket.recv(2048)
             msg = data.decode()
-            data = json.loads(data)
+            data = json.loads(msg)
             if not data['error'] :
-                print('\tFrom : ' , str(data['from']),', MSG : ' ,encryptDecryptData(user['id'],data['msg'],-1))
+                print('\tFrom : ' , str(data['from']),', MSG : ' ,encryptDecryptData(user['key'],data['msg'],-1))
             else :
                 print(data['type'])
-        except :
-            isServer = False
-            print('Server Not Responding')
-            break
+        
+        #    isServer = False
+         #   print('Server Not Responding')
+          #  break
 
 def helpThread() :
     print('\nAvailable Commands')
@@ -93,7 +93,7 @@ user = registerUserThread(clientSocket)
 if not user['error'] :
     isServer = True
     print("use 'help' to get help")
-    id = user['id']
+    id = user['key']
     recevier = threading.Thread(target=receivingThread, args=())
     recevier.start()
     while 1 :
